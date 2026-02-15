@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { prisma } from '@/lib/db'
 import { daysUntil, formatCurrency, formatDate, urgencyColor } from '@/lib/utils'
 import Link from 'next/link'
