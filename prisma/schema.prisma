@@ -1,0 +1,225 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Auth
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String
+  role          String    @default("admin")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// Shared
+model Vertical {
+  id          Int       @id @default(autoincrement())
+  slug        String    @unique
+  name        String
+  description String?
+  domains     Domain[]
+  trademarks  Trademark[]
+}
+
+model Country {
+  id      Int       @id @default(autoincrement())
+  code    String    @unique
+  name    String
+  domains Domain[]
+}
+
+model Entity {
+  id          Int       @id @default(autoincrement())
+  name        String
+  rnc         String?
+  type        String?   // SRL, SA, EIRL, Persona Física
+  domains     Domain[]
+  trademarks  Trademark[]
+  tradeNames  TradeName[]
+  mercantiles MercantileRecord[]
+  createdAt   DateTime  @default(now())
+}
+
+// ============ DOMAINS ============
+model Domain {
+  id              Int       @id @default(autoincrement())
+  name            String    // farmacia
+  tld             String    // .do
+  domainFull      String    @unique // farmacia.do
+  verticalId      Int?
+  vertical        Vertical? @relation(fields: [verticalId], references: [id])
+  countryId       Int?
+  country         Country?  @relation(fields: [countryId], references: [id])
+  subtype         String?
+  status          String    @default("parked") // parked, active, redirect, pointer
+  priority        String    @default("low") // high, medium, low
+  registrar       String?
+  entityId        Int?
+  entity          Entity?   @relation(fields: [entityId], references: [id])
+  registeredAt    DateTime?
+  renewalDate     DateTime?
+  annualCostUsd   Float?
+  // Cloudflare
+  cfZoneId        String?
+  cfNameserver1   String?
+  cfNameserver2   String?
+  cfSslMode       String?
+  cfEmailRouting  Boolean   @default(false)
+  cfEmailDest     String?
+  // Hosting
+  hostingProvider String?
+  serverIp        String?
+  coolifyResource String?
+  containerName   String?
+  port            Int?
+  framework       String?
+  hasLanding      Boolean   @default(false)
+  hasLeadCapture  Boolean   @default(false)
+  // Redirect
+  redirectTo      String?
+  redirectType    String?
+  workerRule      String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  whoisChecks     WhoisCheck[]
+}
+
+model DomainWatchlist {
+  id              Int       @id @default(autoincrement())
+  name            String
+  tld             String
+  domainFull      String    @unique
+  currentOwner    String?
+  registrar       String?
+  expiryDate      DateTime?
+  estimatedPrice  Float?
+  status          String    @default("monitoring") // monitoring, expired, available, offer_sent, acquired, discarded
+  priority        String    @default("medium")
+  vertical        String?
+  lastWhoisCheck  DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  whoisChecks     WhoisCheck[]
+}
+
+model WhoisCheck {
+  id              Int       @id @default(autoincrement())
+  domainId        Int?
+  domain          Domain?   @relation(fields: [domainId], references: [id])
+  watchlistId     Int?
+  watchlist       DomainWatchlist? @relation(fields: [watchlistId], references: [id])
+  domainFull      String
+  registrar       String?
+  expiryDate      DateTime?
+  status          String?   // registered, expired, available, pending_delete
+  rawData         String?
+  checkedAt       DateTime  @default(now())
+}
+
+// ============ ONAPI ============
+model Trademark {
+  id              Int       @id @default(autoincrement())
+  name            String
+  type            String    @default("marca") // marca, marca_colectiva, marca_certificacion
+  niceClass       String?   // Clase Niza
+  expediente      String?   // Número de expediente ONAPI
+  certificate     String?   // Número de certificado
+  entityId        Int?
+  entity          Entity?   @relation(fields: [entityId], references: [id])
+  verticalId      Int?
+  vertical        Vertical? @relation(fields: [verticalId], references: [id])
+  status          String    @default("registered") // pending, published, registered, renewed, expired, opposed
+  registeredAt    DateTime?
+  expiryDate      DateTime?
+  renewalCost     Float?
+  logoUrl         String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  attachments     Attachment[]
+}
+
+model TradeName {
+  id              Int       @id @default(autoincrement())
+  name            String
+  expediente      String?
+  certificate     String?
+  entityId        Int?
+  entity          Entity?   @relation(fields: [entityId], references: [id])
+  status          String    @default("registered")
+  registeredAt    DateTime?
+  expiryDate      DateTime?
+  renewalCost     Float?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  attachments     Attachment[]
+}
+
+// ============ REGISTRO MERCANTIL ============
+model MercantileRecord {
+  id              Int       @id @default(autoincrement())
+  companyName     String
+  rnc             String?
+  companyType     String?   // SRL, SA, EIRL
+  chamber         String?   // Cámara de Comercio (Santo Domingo, Santiago, etc.)
+  registryNumber  String?
+  entityId        Int?
+  entity          Entity?   @relation(fields: [entityId], references: [id])
+  status          String    @default("active")
+  registeredAt    DateTime?
+  renewalDate     DateTime?
+  renewalCost     Float?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  attachments     Attachment[]
+}
+
+// ============ ATTACHMENTS ============
+model Attachment {
+  id              Int       @id @default(autoincrement())
+  filename        String
+  originalName    String
+  mimeType        String
+  size            Int
+  path            String
+  trademarkId     Int?
+  trademark       Trademark? @relation(fields: [trademarkId], references: [id])
+  tradeNameId     Int?
+  tradeName       TradeName? @relation(fields: [tradeNameId], references: [id])
+  mercantileId    Int?
+  mercantile      MercantileRecord? @relation(fields: [mercantileId], references: [id])
+  createdAt       DateTime  @default(now())
+}
+
+// ============ ALERTS ============
+model AlertConfig {
+  id              Int       @id @default(autoincrement())
+  type            String    // domain_expiry, trademark_expiry, mercantile_expiry, whois_change
+  daysBeforeAlert Int       @default(30)
+  telegramChatId  String?
+  emailTo         String?
+  enabled         Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+}
+
+model AlertLog {
+  id              Int       @id @default(autoincrement())
+  type            String
+  assetType       String    // domain, trademark, tradename, mercantile
+  assetId         Int
+  assetName       String
+  message         String
+  sentVia         String    // telegram, email
+  sentAt          DateTime  @default(now())
+}
